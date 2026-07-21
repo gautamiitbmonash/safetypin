@@ -1,125 +1,87 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 
 <head>
 
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>Community Safety Map</title>
+
+<meta name="viewport" content="width=device-width,initial-scale=1">
 
 <link rel="stylesheet"
 href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 
 <style>
 
 body{
-
-    margin:0;
-    font-family:Arial, sans-serif;
-
+margin:0;
+font-family:Arial;
 }
 
 
 #map{
 
-    height:100vh;
-    width:100%;
+height:100vh;
 
 }
 
 
 #panel{
 
-    position:absolute;
-    z-index:1000;
+position:absolute;
 
-    top:15px;
-    right:15px;
+z-index:999;
 
-    width:330px;
+top:10px;
 
-    background:white;
+right:10px;
 
-    padding:15px;
+width:320px;
 
-    border-radius:12px;
+background:white;
 
-    box-shadow:0 5px 20px rgba(0,0,0,.3);
+padding:15px;
 
-}
+border-radius:10px;
 
-
-h2{
-
-    margin-top:0;
+box-shadow:0 0 15px #555;
 
 }
 
 
-input,
-textarea,
-select,
-button{
+input,textarea,select,button{
 
-    width:100%;
-    padding:10px;
+width:100%;
 
-    margin-bottom:10px;
+padding:10px;
 
-    font-size:15px;
-
-}
-
-
-textarea{
-
-    resize:none;
+margin-top:8px;
 
 }
 
 
 button{
 
-    border:none;
+background:#c62828;
 
-    color:white;
+color:white;
 
-    background:#c62828;
+border:none;
 
-    cursor:pointer;
-
-}
-
-
-button:hover{
-
-    background:#8e0000;
+cursor:pointer;
 
 }
 
 
 .gps{
 
-    background:#1565c0;
-
-}
-
-
-.gps:hover{
-
-    background:#003c8f;
-
-}
-
-
-.small{
-
-    font-size:13px;
-    color:#555;
+background:#1565c0;
 
 }
 
@@ -135,23 +97,15 @@ button:hover{
 <div id="panel">
 
 
-<h2>🚨 Safety Report</h2>
+<h3>🚨 Safety Report</h3>
 
 
-<p class="small">
-
-Your location is detected automatically.
-You may also tap the map to change the reporting location.
-
-</p>
-
-
-<button class="gps" onclick="getLocation()">
+<button class="gps"
+onclick="getLocation()">
 
 📍 Detect My Location
 
 </button>
-
 
 
 <select id="category">
@@ -174,15 +128,10 @@ You may also tap the map to change the reporting location.
 
 
 
-<textarea
+<textarea id="description"
+placeholder="Describe the problem">
 
-id="description"
-
-rows="4"
-
-placeholder="Describe the unsafe condition..."
-
-></textarea>
+</textarea>
 
 
 
@@ -204,13 +153,37 @@ Submit Anonymous Report
 <script>
 
 
-// -------------------------
-// MAP INITIALIZATION
-// -------------------------
+// =====================
+// SUPABASE CONNECTION
+// =====================
 
 
-const map = L.map('map')
-.setView([20.5937,78.9629],5);
+const SUPABASE_URL =
+"https://qnidqvklagwjrihlocxh.supabase.co";
+
+
+const SUPABASE_KEY =
+"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFuaWRxdmtsYWd3anJpaGxvY3hoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NDEwNzIsImV4cCI6MjEwMDExNzA3Mn0.R98ONf6DTove9-5Vp1zj-Q7-mc4zt9wid-Zpxny6ngs";
+
+
+const db =
+supabase.createClient(
+
+SUPABASE_URL,
+
+SUPABASE_KEY
+
+);
+
+
+
+// =====================
+// MAP
+// =====================
+
+
+const map=L.map('map')
+.setView([20.59,78.96],5);
 
 
 
@@ -220,9 +193,7 @@ L.tileLayer(
 
 {
 
-maxZoom:19,
-
-attribution:'© OpenStreetMap contributors'
+maxZoom:19
 
 }
 
@@ -232,38 +203,33 @@ attribution:'© OpenStreetMap contributors'
 
 let selectedLocation=null;
 
-let currentMarker=null;
+let tempMarker=null;
 
 let accuracyCircle=null;
 
 
 
 
-// -------------------------
-// GENERATE ANONYMOUS ID
-// -------------------------
+// =====================
+// REPORT ID
+// =====================
 
 
 function generateReportID(){
 
 return (
 
-"RPT-" +
+"RPT-"+
 
 Date.now().toString(36).toUpperCase()
 
 +
 
-"-"
-
-+
+"-"+
 
 Math.random()
-
 .toString(36)
-
 .substring(2,7)
-
 .toUpperCase()
 
 );
@@ -274,136 +240,57 @@ Math.random()
 
 
 
-// -------------------------
-// GET GPS LOCATION
-// -------------------------
+// =====================
+// GPS
+// =====================
 
 
 function getLocation(){
 
 
-if(!navigator.geolocation){
-
-alert("GPS not supported.");
-
-return;
-
-}
-
-
-
 navigator.geolocation.getCurrentPosition(
 
-function(position){
+function(pos){
 
 
-let lat =
-position.coords.latitude;
+let lat=pos.coords.latitude;
 
-
-let lng =
-position.coords.longitude;
-
-
-let accuracy =
-position.coords.accuracy;
-
+let lng=pos.coords.longitude;
 
 
 selectedLocation=L.latLng(lat,lng);
 
 
 
-if(currentMarker){
+if(tempMarker)
 
-map.removeLayer(currentMarker);
-
-}
-
-
-if(accuracyCircle){
-
-map.removeLayer(accuracyCircle);
-
-}
+map.removeLayer(tempMarker);
 
 
 
-currentMarker=L.marker(selectedLocation)
+tempMarker=L.marker(selectedLocation)
 
 .addTo(map);
 
 
 
-accuracyCircle=L.circle(
+map.setView(
 
 selectedLocation,
 
-{
-
-radius:accuracy,
-
-color:"#1976d2",
-
-fillColor:"#1976d2",
-
-fillOpacity:.15
-
-}
-
-)
-
-.addTo(map);
-
-
-
-map.fitBounds(
-
-accuracyCircle.getBounds()
+18
 
 );
 
 
 
-currentMarker
-
-.bindPopup(
-
-"📍 Your Current Location"
-
-)
-
+tempMarker
+.bindPopup("Your Location")
 .openPopup();
 
 
 
-},
-
-
-
-function(error){
-
-
-alert(
-
-"Unable to get location. Please allow GPS permission."
-
-);
-
-
-},
-
-
-{
-
-enableHighAccuracy:true,
-
-timeout:10000,
-
-maximumAge:0
-
 }
-
 
 );
 
@@ -413,87 +300,47 @@ maximumAge:0
 
 
 
+// =====================
+// CLICK MAP
+// =====================
 
-// -------------------------
-// CHANGE LOCATION MANUALLY
-// -------------------------
 
-
-map.on(
-
-'click',
-
-function(e){
+map.on('click',function(e){
 
 
 selectedLocation=e.latlng;
 
 
+if(tempMarker)
 
-if(currentMarker){
-
-map.removeLayer(currentMarker);
-
-}
+map.removeLayer(tempMarker);
 
 
 
-if(accuracyCircle){
-
-map.removeLayer(accuracyCircle);
-
-accuracyCircle=null;
-
-}
-
-
-
-currentMarker=L.marker(
-
+tempMarker=L.marker(
 selectedLocation
-
 )
 
 .addTo(map);
 
 
-
-currentMarker
-
-.bindPopup(
-
-"Selected Report Location"
-
-)
-
-.openPopup();
-
-
-
-}
-
-);
+});
 
 
 
 
 
-// -------------------------
-// SUBMIT REPORT
-// -------------------------
+// =====================
+// SAVE REPORT
+// =====================
 
 
-function submitReport(){
-
+async function submitReport(){
 
 
 if(!selectedLocation){
 
-alert(
-
-"Please detect GPS location or click on the map."
-
-);
+alert("Select location first");
 
 return;
 
@@ -501,46 +348,94 @@ return;
 
 
 
-let category=
-
-document.getElementById("category").value;
+let report={
 
 
-
-let description=
-
-document.getElementById("description").value;
+report_id:
+generateReportID(),
 
 
-
-let reportID=
-
-generateReportID();
+category:
+document.getElementById("category").value,
 
 
-
-let timestamp=
-
-new Date()
-
-.toLocaleString();
+description:
+document.getElementById("description").value,
 
 
+latitude:
+selectedLocation.lat,
+
+
+longitude:
+selectedLocation.lng,
+
+
+timestamp:
+new Date().toISOString()
+
+
+};
 
 
 
-// Create public marker
+const {error}=await db
+
+.from("safety_reports")
+
+.insert([report]);
 
 
-let reportMarker=
 
-L.circleMarker(
+if(error){
 
-selectedLocation,
+alert(error.message);
+
+return;
+
+}
+
+
+
+addMarker(report);
+
+
+
+alert(
+
+"Report Saved\n"+
+report.report_id
+
+);
+
+
+
+}
+
+
+
+
+// =====================
+// DISPLAY MARKER
+// =====================
+
+
+function addMarker(report){
+
+
+let marker=L.circleMarker(
+
+[
+
+report.latitude,
+
+report.longitude
+
+],
 
 {
 
-radius:10,
+radius:8,
 
 color:"red",
 
@@ -556,97 +451,71 @@ fillOpacity:.8
 
 
 
+marker.bindPopup(`
 
 
-reportMarker.bindPopup(`
-
-
-<b>🚨 ${category}</b>
+<b>🚨 ${report.category}</b>
 
 <br><br>
 
 
-<b>Anonymous Report ID:</b>
+ID:
 
-<br>
-
-${reportID}
+${report.report_id}
 
 
 <br><br>
 
 
-<b>Date & Time:</b>
+Time:
 
-<br>
-
-${timestamp}
-
-
-<br><br>
-
-
-<b>Description:</b>
-
-<br>
-
-${description || "No description provided"}
+${new Date(report.timestamp)
+.toLocaleString()}
 
 
 <br><br>
 
 
-<b>Coordinates:</b>
-
-<br>
-
-${selectedLocation.lat.toFixed(6)},
-
-${selectedLocation.lng.toFixed(6)}
+${report.description}
 
 
 `);
 
-
-
-
-
-// clear temporary marker
-
-
-if(currentMarker){
-
-map.removeLayer(currentMarker);
-
-currentMarker=null;
-
-}
-
-
-
-if(accuracyCircle){
-
-map.removeLayer(accuracyCircle);
-
-accuracyCircle=null;
-
 }
 
 
 
 
-selectedLocation=null;
+
+// =====================
+// LOAD EXISTING REPORTS
+// =====================
 
 
-document.getElementById("description").value="";
+async function loadReports(){
+
+
+const {data,error}=
+
+await db
+
+.from("safety_reports")
+
+.select("*");
 
 
 
-alert(
+if(error){
 
-"Report submitted successfully!\n\nYour Report ID:\n"+reportID
+console.log(error);
 
-);
+return;
+
+}
+
+
+
+data.forEach(addMarker);
 
 
 
@@ -655,15 +524,16 @@ alert(
 
 
 
-
-// -------------------------
-// AUTO GPS ON LOAD
-// -------------------------
+// =====================
+// START
+// =====================
 
 
 window.onload=function(){
 
 getLocation();
+
+loadReports();
 
 };
 
